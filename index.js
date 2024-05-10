@@ -35,6 +35,12 @@ async function run() {
       .db("volunteerManagementDB")
       .collection("volunteers");
 
+    // get all volunteers from the database
+    app.get("/volunteers", async (req, res) => {
+      const result = await volunteerCollection.find().toArray();
+      res.send(result);
+    });
+
     // add volunteer to the database
     app.post("/add-volunteer", async (req, res) => {
       const volunteer = req.body;
