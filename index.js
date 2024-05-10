@@ -41,6 +41,14 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/volunteers/:email", async (req, res) => {
+      const email = req.params?.email;
+      const query = { email: email };
+      console.log(email);
+      const result = await volunteerCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // add volunteer to the database
     app.post("/add-volunteer", async (req, res) => {
       const volunteer = req.body;
