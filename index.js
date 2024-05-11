@@ -45,8 +45,16 @@ async function run() {
       .collection("requests");
 
     // get all volunteers from the database
-    app.get("/volunteers", async (req, res) => {
-      const result = await volunteerCollection.find().toArray();
+    app.get("/all-volunteers", async (req, res) => {
+      const search = req.query?.search;
+      console.log(search);
+
+      let query = {};
+      if (search) {
+        query = { title: { $regex: search, $options: "i" } };
+      }
+
+      const result = await volunteerCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -104,6 +112,20 @@ async function run() {
     });
 
     // request related api
+
+    app.get("/requests/:email", async (req, res) => {
+      const {
+        params: { email },
+      } = req;
+      console.log(email, "from client");
+      const result = await requestCollection
+        .find({
+          "organizer_info.organizer_email": email,
+        })
+        .toArray();
+      res.send(result);
+    });
+
     app.post("/requests", async (req, res) => {
       const volunteerReq = req.body;
 
@@ -131,6 +153,15 @@ async function run() {
       );
       console.log(updateReqCount, "updated doc");
 
+      res.send(result);
+    });
+
+    app.delete("/requests/:id", async (req, res) => {
+      const {
+        params: { id },
+      } = req;
+      const query = { _id: new ObjectId(id) };
+      const result = await requestCollection.deleteOne(query);
       res.send(result);
     });
 
