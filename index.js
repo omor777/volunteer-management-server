@@ -11,7 +11,12 @@ const port = process.env.PORT || 5000;
 app.use(express.json());
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://volunteer-management-91459.web.app",
+      "https://volunteer-management-91459.firebaseapp.com",
+    ],
     credentials: true,
     optionsSuccessStatus: 200,
   })
@@ -19,6 +24,7 @@ app.use(
 app.use(cookieParser());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6ze9kj8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+// const uri = `mongodb+srv://volunteer:WAeAMbvRV06W3Hff@cluster0.6ze9kj8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -34,6 +40,9 @@ async function run() {
     const volunteerCollection = client
       .db("volunteerManagementDB")
       .collection("volunteers");
+    const requestCollection = client
+      .db("volunteerManagementDB")
+      .collection("requests");
 
     // get all volunteers from the database
     app.get("/volunteers", async (req, res) => {
@@ -94,11 +103,42 @@ async function run() {
       res.send(result);
     });
 
+    // request related api
+    app.post("/requests", async (req, res) => {
+      const volunteerReq = req.body;
+
+      // const query = {
+      //   email:volunteerReq?.organizer_email,
+      //   postId:volunteerReq?.postId
+      // }
+
+      // const alreadyRequest = await requestCollection.findOne(query)
+      // console.log(alreadyRequest);
+      // if(alreadyRequest) {
+      //   return res.status(400).send('You have already request this post!')
+      // }
+
+      const result = await requestCollection.insertOne(volunteerReq);
+
+      const updateDoc = {
+        $inc: { volunteer: -1 },
+      };
+
+      const reqQuery = { _id: new ObjectId(volunteerReq?.postId) };
+      const updateReqCount = await volunteerCollection.updateOne(
+        reqQuery,
+        updateDoc
+      );
+      console.log(updateReqCount, "updated doc");
+
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
   }
 }
