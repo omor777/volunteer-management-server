@@ -23,6 +23,30 @@ app.use(
 );
 app.use(cookieParser());
 
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).send({ message: "unauthorized access" });
+  if (token) {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        console.log(err);
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      // console.log(decoded, "decoden info");
+
+      req.user = decoded;
+      next();
+    });
+  }
+};
+
+// cookie options
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6ze9kj8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 // const uri = `mongodb+srv://volunteer:WAeAMbvRV06W3Hff@cluster0.6ze9kj8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -44,6 +68,24 @@ async function run() {
       .db("volunteerManagementDB")
       .collection("requests");
 
+    //creating Token
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log("user for token", user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "365d",
+      });
+
+      res.cookie("token", token, cookieOptions).send({ success: true });
+    });
+
+    //clearing Token
+    app.post("/logout", async (req, res) => {
+      res
+        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
+        .send({ success: true });
+    });
+
     // get all volunteers from the database
     app.get("/all-volunteers", async (req, res) => {
       const search = req.query?.search;
@@ -58,9 +100,15 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/volunteers/:email", async (req, res) => {
+    app.get("/volunteers/:email", verifyToken, async (req, res) => {
       const email = req.params?.email;
       const query = { email: email };
+      const tokenEmail = req?.user?.email;
+      // console.log(tokenEmail, "tokenk email");
+      if (email !== tokenEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+
       // console.log(email);
       const result = await volunteerCollection.find(query).toArray();
       res.send(result);
@@ -113,11 +161,16 @@ async function run() {
 
     // request related api
 
-    app.get("/requests/:email", async (req, res) => {
+    app.get("/requests/:email", verifyToken, async (req, res) => {
       const {
         params: { email },
       } = req;
-      console.log(email, "from client");
+      // console.log(email, "from client");
+      const tokenEmail = req?.user?.email;
+      // console.log(tokenEmail, "tokenk email");
+      if (email !== tokenEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const result = await requestCollection
         .find({
           "organizer_info.organizer_email": email,
@@ -182,28 +235,3 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`server on running port ${port}`);
 });
-
-// cookie options
-// const cookieOptions = {
-//   httpOnly: true,
-//   secure: process.env.NODE_ENV === "production",
-//   sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-// };
-
-// //creating Token
-// app.post("/jwt", logger, async (req, res) => {
-//     const user = req.body;
-//     console.log("user for token", user);
-//     const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
-
-//     res.cookie("token", token, cookieOptions).send({ success: true });
-//   });
-
-//   //clearing Token
-//   app.post("/logout", async (req, res) => {
-//     const user = req.body;
-//     console.log("logging out", user);
-//     res
-//       .clearCookie("token", { ...cookieOptions, maxAge: 0 })
-//       .send({ success: true });
-//   });
