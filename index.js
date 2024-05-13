@@ -32,7 +32,6 @@ const verifyToken = (req, res, next) => {
         console.log(err);
         return res.status(401).send({ message: "unauthorized access" });
       }
-      // console.log(decoded, "decoden info");
 
       req.user = decoded;
       next();
@@ -71,7 +70,7 @@ async function run() {
     //creating Token
     app.post("/jwt", async (req, res) => {
       const user = req.body;
-      console.log("user for token", user);
+      // console.log("user for token", user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "365d",
       });
@@ -89,14 +88,41 @@ async function run() {
     // get all volunteers from the database
     app.get("/all-volunteers", async (req, res) => {
       const search = req.query?.search;
-      console.log(search);
+      const page = parseInt(req.query?.page) - 1;
+      const size = parseInt(req.query?.size);
+
+      console.log("page size", req.query.page, size);
 
       let query = {};
       if (search) {
         query = { title: { $regex: search, $options: "i" } };
       }
 
-      const result = await volunteerCollection.find(query).toArray();
+      const result = await volunteerCollection
+        .find(query)
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+
+      res.send(result);
+    });
+
+    // get total volunteers count
+    app.get("/volunteers-count", async (req, res) => {
+      const search = req.query.search;
+      const query = {
+        title: { $regex: search, $options: "i" },
+      };
+      const count = await volunteerCollection.countDocuments(query);
+      res.send({ count });
+    });
+
+    app.get("/volunteers-now", async (req, res) => {
+      const result = await volunteerCollection
+        .find()
+        .sort({ deadline: 1 })
+        .limit(6)
+        .toArray();
       res.send(result);
     });
 
@@ -117,7 +143,7 @@ async function run() {
     // get a single volunteer by id
     app.get("/volunteers/s/:id", async (req, res) => {
       const id = req.params?.id;
-      console.log(id);
+      // console.log(id);
       const query = { _id: new ObjectId(id) };
       const result = await volunteerCollection.findOne(query);
       res.send(result);
@@ -126,7 +152,7 @@ async function run() {
     // add volunteer to the database
     app.post("/add-volunteer", async (req, res) => {
       const volunteer = req.body;
-      console.log(volunteer);
+      // console.log(volunteer);
       const result = await volunteerCollection.insertOne(volunteer);
       res.send(result);
     });
@@ -153,7 +179,6 @@ async function run() {
     // delete a volunteer by id
     app.delete("/volunteers/:id", async (req, res) => {
       const id = req.params?.id;
-      console.log(id, "form client");
       const query = { _id: new ObjectId(id) };
       const result = await volunteerCollection.deleteOne(query);
       res.send(result);
@@ -165,15 +190,13 @@ async function run() {
       const {
         params: { email },
       } = req;
-      // console.log(email, "from client");
       const tokenEmail = req?.user?.email;
-      // console.log(tokenEmail, "tokenk email");
       if (email !== tokenEmail) {
         return res.status(403).send({ message: "forbidden access" });
       }
       const result = await requestCollection
         .find({
-          "organizer_info.organizer_email": email,
+          "volunteer_info.volunteer_email": email,
         })
         .toArray();
       res.send(result);
@@ -181,6 +204,13 @@ async function run() {
 
     app.post("/requests", async (req, res) => {
       const volunteerReq = req.body;
+
+      // validation check if volunteer === 0
+      const volunteerCount = { _id: new ObjectId(volunteerReq.postId) };
+      const { volunteer } = await volunteerCollection.findOne(volunteerCount);
+      if (volunteer < 1) {
+        return res.send({ message: "No Need volunteer" });
+      }
 
       // const query = {
       //   email:volunteerReq?.organizer_email,
@@ -204,7 +234,6 @@ async function run() {
         reqQuery,
         updateDoc
       );
-      console.log(updateReqCount, "updated doc");
 
       res.send(result);
     });
@@ -212,9 +241,18 @@ async function run() {
     app.delete("/requests/:id", async (req, res) => {
       const {
         params: { id },
+        query: { postId },
       } = req;
+
       const query = { _id: new ObjectId(id) };
       const result = await requestCollection.deleteOne(query);
+      // undo volunteers need count
+      const undoQuery = { _id: new ObjectId(postId) };
+      const updateDoc = {
+        $inc: { volunteer: 1 },
+      };
+
+      await volunteerCollection.updateOne(undoQuery, updateDoc);
       res.send(result);
     });
 
