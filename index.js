@@ -29,7 +29,6 @@ const verifyToken = (req, res, next) => {
   if (token) {
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
       if (err) {
-        console.log(err);
         return res.status(401).send({ message: "unauthorized access" });
       }
 
@@ -70,7 +69,6 @@ async function run() {
     //creating Token
     app.post("/jwt", async (req, res) => {
       const user = req.body;
-      // console.log("user for token", user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "365d",
       });
@@ -91,7 +89,6 @@ async function run() {
       const page = parseInt(req.query?.page) - 1;
       const size = parseInt(req.query?.size);
 
-      console.log("page size", req.query.page, size);
 
       let query = {};
       if (search) {
@@ -130,12 +127,10 @@ async function run() {
       const email = req.params?.email;
       const query = { email: email };
       const tokenEmail = req?.user?.email;
-      // console.log(tokenEmail, "tokenk email");
       if (email !== tokenEmail) {
         return res.status(403).send({ message: "forbidden access" });
       }
 
-      // console.log(email);
       const result = await volunteerCollection.find(query).toArray();
       res.send(result);
     });
@@ -143,7 +138,6 @@ async function run() {
     // get a single volunteer by id
     app.get("/volunteers/s/:id", async (req, res) => {
       const id = req.params?.id;
-      // console.log(id);
       const query = { _id: new ObjectId(id) };
       const result = await volunteerCollection.findOne(query);
       res.send(result);
@@ -152,7 +146,6 @@ async function run() {
     // add volunteer to the database
     app.post("/add-volunteer", async (req, res) => {
       const volunteer = req.body;
-      // console.log(volunteer);
       const result = await volunteerCollection.insertOne(volunteer);
       res.send(result);
     });
@@ -212,16 +205,16 @@ async function run() {
         return res.send({ message: "No Need volunteer" });
       }
 
-      // const query = {
-      //   email:volunteerReq?.organizer_email,
-      //   postId:volunteerReq?.postId
-      // }
+      const query = {
+        email:volunteerReq?.organizer_email,
+        postId:volunteerReq?.postId
+      }
 
-      // const alreadyRequest = await requestCollection.findOne(query)
-      // console.log(alreadyRequest);
-      // if(alreadyRequest) {
-      //   return res.status(400).send('You have already request this post!')
-      // }
+      const alreadyRequest = await requestCollection.findOne(query)
+      console.log(alreadyRequest);
+      if(alreadyRequest) {
+        return res.status(400).send('You have already request this post!')
+      }
 
       const result = await requestCollection.insertOne(volunteerReq);
 
@@ -255,12 +248,6 @@ async function run() {
       await volunteerCollection.updateOne(undoQuery, updateDoc);
       res.send(result);
     });
-
-    // Send a ping to confirm a successful connection
-    // await client.db("admin").command({ ping: 1 });
-    // console.log(
-    //   "Pinged your deployment. You successfully connected to MongoDB!"
-    // );
   } finally {
   }
 }
